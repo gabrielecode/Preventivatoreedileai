@@ -340,6 +340,8 @@ button{cursor:pointer;font-family:inherit;font-size:14px;border-radius:var(--rad
   </main>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script>
 const COUNTRIES={IT:{vat:22,currency:'EUR',symbol:'€',name:'Italia'},CH:{vat:8.1,currency:'CHF',symbol:'CHF',name:'Svizzera'},DE:{vat:19,currency:'EUR',symbol:'€',name:'Germania'},FR:{vat:20,currency:'EUR',symbol:'€',name:'Francia'},AT:{vat:20,currency:'EUR',symbol:'€',name:'Austria'},BE:{vat:21,currency:'EUR',symbol:'€',name:'Belgio'},ES:{vat:21,currency:'EUR',symbol:'€',name:'Spagna'},PT:{vat:23,currency:'EUR',symbol:'€',name:'Portogallo'},NL:{vat:21,currency:'EUR',symbol:'€',name:'Paesi Bassi'}};
 
@@ -535,7 +537,108 @@ function renderQuote(data){
   if(items.length){html+=`<table class="cost-table"><thead><tr><th>Descrizione</th><th style="text-align:right">Q.tà</th><th style="text-align:right">Unitario</th><th style="text-align:right">Totale</th></tr></thead><tbody>`;items.forEach(item=>{html+=`<tr><td>${item.description}</td><td style="text-align:right">${item.quantity} ${item.unit}</td><td style="text-align:right">${item.unitPrice.toFixed(2)} ${co.symbol}</td><td style="text-align:right;font-weight:600">${item.total.toFixed(2)} ${co.symbol}</td></tr>`;});html+=`</tbody></table>`;}
   html+=`<div style="border-top:1px solid var(--border);padding-top:12px;margin-top:12px"><div style="display:flex;justify-content:space-between;margin-bottom:6px"><span>Imponibile</span><strong>${subtotal.toFixed(2)} ${co.symbol}</strong></div><div style="display:flex;justify-content:space-between;margin-bottom:10px"><span>IVA ${document.getElementById('vatRate').value}%</span><strong>${vat.toFixed(2)} ${co.symbol}</strong></div><div style="display:flex;justify-content:space-between;font-size:16px;font-weight:700;color:var(--accent)"><span>TOTALE</span><span>${total.toFixed(2)} ${co.symbol}</span></div></div>`;if(data.feasibility){html+=`<div style="margin-top:16px;padding:12px;background:var(--success-bg);border-left:3px solid var(--success);border-radius:0 4px 4px 0"><strong style="color:var(--success)">✓ Fattibilità</strong><p style="margin:4px 0 0;font-size:12px">${data.feasibility.summary||'Ok'}</p></div>`;}
   html+=`</div>`;
+  html+=`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px"><button type="button" class="btn-secondary" onclick="downloadQuotePdf()">⬇ Scarica PDF</button><button type="button" class="btn-secondary" onclick="shareQuoteWhatsApp()">📲 Condividi WhatsApp</button><button type="button" class="btn-secondary" onclick="shareQuoteEmail()">✉ Condividi Email</button></div>`;
   document.getElementById('previewContent').innerHTML=html;
+}
+
+function getQuotePdfFileName(){
+  const customer=(document.getElementById('customerName').value||'Cliente').trim();
+  const project=(document.getElementById('projectName').value||'Progetto').trim();
+  const date=new Date().toISOString().slice(0,10);
+  const safe=(v)=>v.replace(/[^a-zA-Z0-9-_ ]/g,'').replace(/\s+/g,'_').slice(0,40);
+  return `Preventivo_${safe(customer)}_${safe(project)}_${date}.pdf`;
+}
+
+async function createQuotePdfBlob(){
+  const quoteEl=document.querySelector('#previewContent .quote-doc');
+  if(!quoteEl)throw new Error('Nessun preventivo disponibile da esportare.');
+  if(!window.html2canvas || !window.jspdf)throw new Error('Librerie PDF non caricate.');
+
+  const canvas=await window.html2canvas(quoteEl,{scale:2,backgroundColor:'#ffffff',useCORS:true});
+  const imgData=canvas.toDataURL('image/png');
+  const { jsPDF }=window.jspdf;
+  const pdf=new jsPDF('p','mm','a4');
+  const pageWidth=pdf.internal.pageSize.getWidth();
+  const pageHeight=pdf.internal.pageSize.getHeight();
+  const margin=10;
+  const printableWidth=pageWidth-(margin*2);
+  const printableHeight=pageHeight-(margin*2);
+  const imgWidth=printableWidth;
+  const imgHeight=(canvas.height*imgWidth)/canvas.width;
+
+  let heightLeft=imgHeight;
+  let position=margin;
+  pdf.addImage(imgData,'PNG',margin,position,imgWidth,imgHeight,undefined,'FAST');
+  heightLeft-=printableHeight;
+
+  while(heightLeft>0){
+    pdf.addPage();
+    position=margin-(imgHeight-heightLeft);
+    pdf.addImage(imgData,'PNG',margin,position,imgWidth,imgHeight,undefined,'FAST');
+    heightLeft-=printableHeight;
+  }
+
+  return pdf.output('blob');
+}
+
+async function downloadQuotePdf(){
+  try{
+    const blob=await createQuotePdfBlob();
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;
+    a.download=getQuotePdfFileName();
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }catch(err){
+    alert(`Errore download PDF: ${err.message||err}`);
+  }
+}
+
+async function shareQuoteWhatsApp(){
+  try{
+    const blob=await createQuotePdfBlob();
+    const fileName=getQuotePdfFileName();
+    const file=new File([blob],fileName,{type:'application/pdf'});
+    const customer=(document.getElementById('customerName').value||'Cliente').trim();
+    const project=(document.getElementById('projectName').value||'Progetto').trim();
+    const text=`Preventivo edile per ${customer} - ${project}`;
+
+    if(navigator.share && navigator.canShare && navigator.canShare({files:[file]})){
+      await navigator.share({title:'Preventivo Edile AI',text,files:[file]});
+      return;
+    }
+
+    const waMsg=encodeURIComponent(`${text}\nPDF pronto da allegare.`);
+    window.open(`https://wa.me/?text=${waMsg}`,'_blank');
+    alert('WhatsApp Web non supporta allegato PDF automatico in tutti i browser. Ho aperto la chat con il testo: allega il PDF scaricato.');
+  }catch(err){
+    alert(`Errore condivisione WhatsApp: ${err.message||err}`);
+  }
+}
+
+async function shareQuoteEmail(){
+  try{
+    const blob=await createQuotePdfBlob();
+    const fileName=getQuotePdfFileName();
+    const file=new File([blob],fileName,{type:'application/pdf'});
+    const customer=(document.getElementById('customerName').value||'Cliente').trim();
+    const project=(document.getElementById('projectName').value||'Progetto').trim();
+    const subject=`Preventivo ${project}`;
+    const body='In allegato il preventivo PDF generato con Preventivatore Edile AI.';
+
+    if(navigator.share && navigator.canShare && navigator.canShare({files:[file]})){
+      await navigator.share({title:subject,text:body,files:[file]});
+      return;
+    }
+
+    window.location.href=`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    alert('Alcuni client email web non accettano allegati automatici via browser. Se necessario, allega il PDF appena scaricato.');
+  }catch(err){
+    alert(`Errore condivisione Email: ${err.message||err}`);
+  }
 }
 </script>
 </body>
