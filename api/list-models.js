@@ -1,9 +1,15 @@
 // Test endpoint per scoprire quali modelli sono disponibili
 export default async function handler(req, res) {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey =
+    process.env.GEMINI_API_KEY ||
+    process.env.NEXT_PUBLIC_GEMINI_API_KEY ||
+    process.env.GOOGLE_API_KEY;
   
   if (!apiKey) {
-    return res.status(500).json({ error: 'API key not configured' });
+    return res.status(500).json({
+      error:
+        'API key not configured. Set GEMINI_API_KEY (recommended) or NEXT_PUBLIC_GEMINI_API_KEY in Vercel.',
+    });
   }
 
   try {

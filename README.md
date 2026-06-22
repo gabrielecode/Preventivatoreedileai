@@ -11,7 +11,7 @@ A sophisticated web application for creating detailed construction estimates and
 - 🧮 **Dynamic Item Catalog**: 40+ pre-configured construction work items with price ranges
 - 💼 **Professional Quotes**: AI-generated detailed cost breakdowns and feasibility reports
 - 📊 **Tax & Currency Support**: 9 European countries with automatic VAT calculation
-- 💾 **Local Storage**: API key saved securely in browser (no server-side storage)
+- ☁️ **Serverless API**: Secure Gemini calls via Vercel Functions (`/api/generate-quote`)
 - 📱 **Fully Responsive**: Works on desktop, tablet, and mobile devices
 
 ## 🚀 Deployment on Vercel
@@ -28,11 +28,11 @@ A sophisticated web application for creating detailed construction estimates and
    - Select this repository
    - Click "Deploy"
 
-2. **Configure Environment Variables (Optional)**
+2. **Configure Environment Variables**
    - Add in Vercel Settings → Environment Variables:
-   - Key: `NEXT_PUBLIC_GEMINI_API_KEY`
+   - Key: `GEMINI_API_KEY` (recommended)
    - Value: Your Gemini API key
-   - *Note: This is optional as the app uses client-side API key input*
+   - Backward compatibility: `NEXT_PUBLIC_GEMINI_API_KEY` is also supported
 
 3. **Access Your App**
    - Vercel will provide a unique URL
@@ -46,15 +46,15 @@ A sophisticated web application for creating detailed construction estimates and
 4. **Customize Items**: Adjust prices and quantities
 5. **Enter Project Details**: Client info, project description, company data
 6. **Set Dimensions & Labor**: Site parameters and labor costs
-7. **Generate Quote**: Enter your Gemini API key and click generate
+7. **Generate Quote**: Click generate and the serverless API creates the quote with Gemini
 8. **Export/Share**: Copy quote text or export as needed
 
 ## 🔐 Security
 
 - ✅ No hardcoded API keys
-- ✅ API key input is optional (uses user's key or default approach)
-- ✅ No backend server required
-- ✅ All processing happens in the browser
+- ✅ API key is kept server-side in Vercel env vars
+- ✅ No dedicated backend server required (serverless functions)
+- ✅ Frontend never exposes the secret key
 - ✅ Complies with GitHub secret scanning
 
 ## 📊 Supported Trades & Items
@@ -88,7 +88,7 @@ A sophisticated web application for creating detailed construction estimates and
 ## 🛠️ Technical Stack
 
 - **Frontend**: Vanilla HTML5, CSS3, JavaScript (ES6+)
-- **API**: Google Generative Language API (Gemini)
+- **API**: Vercel Functions + Google Generative Language API (Gemini)
 - **Deployment**: Vercel (Static hosting)
 - **Storage**: Browser LocalStorage
 
