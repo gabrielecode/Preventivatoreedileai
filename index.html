@@ -318,14 +318,12 @@ button{cursor:pointer;font-family:inherit;font-size:14px;border-radius:var(--rad
         <span>▾</span>
       </div>
       <div class="section-body">
-        <label>Chiave API Gemini *</label>
-        <input type="password" id="apiKeyInput" placeholder="AIza..." oninput="saveApiKey()"/>
-        <div style="font-size:11px;color:var(--txt3);margin-top:6px">
-          Ottieni da <a href="https://ai.google.dev/" target="_blank" style="color:var(--accent);text-decoration:none">ai.google.dev</a>
-        </div>
-        <button class="btn-primary" id="generateBtn" onclick="generateQuote()" style="margin-top:12px">
-          <span id="generateBtnText">⚡ Genera Preventivo</span>
+        <button class="btn-primary" id="generateBtn" onclick="generateQuote()">
+          <span id="generateBtnText">⚡ Genera Preventivo con IA</span>
         </button>
+        <div style="font-size:11px;color:var(--txt3);margin-top:12px;text-align:center">
+          💡 Powered by Google Gemini<br/>Analisi completamente privata
+        </div>
       </div>
     </div>
   </aside>
@@ -499,29 +497,18 @@ function toggleSection(head){
   head.querySelector('span:last-child').textContent=body.classList.contains('hidden')?'▸':'▾';
 }
 
-function saveApiKey(){
-  const val=document.getElementById('apiKeyInput').value;
-  try{val?localStorage.setItem('preventivatore_apikey',val):localStorage.removeItem('preventivatore_apikey');}catch(e){}
-}
-
-function getApiKey(){
-  return document.getElementById('apiKeyInput').value.trim();
-}
-
 async function generateQuote(){
   const custName=document.getElementById('customerName').value.trim();
   const projName=document.getElementById('projectName').value.trim();
   const workDesc=document.getElementById('workDescription').value.trim();
   if(!custName || !projName || !workDesc){alert('Compila: Committente, Progetto, Descrizione');return;}
-  const apiKey=getApiKey();
-  if(!apiKey){alert('⚠️ Inserisci Chiave API Gemini (https://ai.google.dev/)');document.getElementById('apiKeyInput').focus();return;}
   document.getElementById('generateBtn').disabled=true;
   document.getElementById('generateBtnText').textContent='⏳ Generazione...';
-  document.getElementById('previewContent').innerHTML='<div style="text-align:center;padding:48px"><div class="spinner"></div><p style="margin-top:16px;color:var(--txt2)">Generando preventivo...</p></div>';
-  try{const result=await callGemini(apiKey);renderQuote(result);}catch(err){document.getElementById('previewContent').innerHTML=`<div style="padding:24px;color:var(--danger)"><strong>⚠️ Errore:</strong> ${err.message}</div>`;}finally{document.getElementById('generateBtn').disabled=false;document.getElementById('generateBtnText').textContent='⚡ Genera Preventivo';}
+  document.getElementById('previewContent').innerHTML='<div style="text-align:center;padding:48px"><div class="spinner"></div><p style="margin-top:16px;color:var(--txt2)">Analizzando cantiere e generando preventivo...</p></div>';
+  try{const result=await callGeminiAPI();renderQuote(result);}catch(err){document.getElementById('previewContent').innerHTML=`<div style="padding:24px;color:var(--danger)"><strong>⚠️ Errore:</strong> ${err.message}</div>`;}finally{document.getElementById('generateBtn').disabled=false;document.getElementById('generateBtnText').textContent='⚡ Genera Preventivo con IA';}
 }
 
-async function callGemini(apiKey){
+async function callGeminiAPI(){
   const co=COUNTRIES[state.country];
   const sec=SECTORS.find(s=>s.id===state.sectorId)||SECTORS[0];
   const custName=document.getElementById('customerName').value.trim();
@@ -530,9 +517,11 @@ async function callGemini(apiKey){
   const notes=document.getElementById('additionalNotes').value.trim();
   const itemsStr=state.selectedItems.map(i=>`- ${i.name}: ${i.customPrice} ${co.symbol}/${i.unit} × ${i.quantity}`).join('\n');
   const prompt=`Genera preventivo edile in italiano per: ${custName} - ${projName} (${sec.name}). Paese: ${co.name} IVA ${document.getElementById('vatRate').value}%. Descrizione: ${workDesc}. Lavorazioni:\n${itemsStr||'Nessuna'}. Rispondi SOLO JSON: {"feasibility":{"rating":4,"summary":"...","risks":["..."]},"costsBreakdown":[{"description":"...","quantity":1,"unit":"mq","unitPrice":100,"total":100}],"estimatedTime":"..."}`;
-  const models=['gemini-2.0-flash','gemini-1.5-flash'];
-  for(const model of models){
-    try{const resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{temperature:0.4,maxOutputTokens:2048}})});const data=await resp.json();if(!resp.ok)throw new Error(data.error?.message||'Errore API');const raw=data.candidates?.[0]?.content?.parts?.[0]?.text;if(!raw)throw new Error('Vuoto');const clean=raw.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();return JSON.parse(clean);}catch(e){await new Promise(r=>setTimeout(r,300));}}throw new Error('Servizio non disponibile');}
+  const resp=await fetch('/api/generate-quote',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})});
+  const data=await resp.json();
+  if(!resp.ok)throw new Error(data.error||'Errore generazione');
+  return data;
+}
 
 function renderQuote(data){
   const co=COUNTRIES[state.country];
