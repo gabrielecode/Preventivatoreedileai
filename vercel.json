@@ -1,9 +1,6 @@
 {
   "buildCommand": "",
   "outputDirectory": ".",
-  "env": {
-    "GEMINI_API_KEY": "@gemini_api_key"
-  },
   "functions": {
     "api/**/*.js": {
       "memory": 1024,
