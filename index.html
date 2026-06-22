@@ -301,10 +301,70 @@ button{cursor:pointer;font-family:inherit;font-size:14px;border-radius:var(--rad
         <span>▾</span>
       </div>
       <div class="section-body">
+        <label>Ragione Sociale Emittente</label>
+        <input type="text" id="issuerCompany" value="EdilArtigiana S.r.l." placeholder="Es. EdilArtigiana S.r.l."/>
+        <div class="field-row">
+          <div>
+            <label>P.IVA / CF Emittente</label>
+            <input type="text" id="issuerVat" value="IT12345678901" placeholder="Es. IT12345678901"/>
+          </div>
+          <div>
+            <label>Telefono Emittente</label>
+            <input type="text" id="issuerPhone" value="+39 06 1234567" placeholder="Es. +39 06 1234567"/>
+          </div>
+        </div>
+        <label>Indirizzo Emittente</label>
+        <input type="text" id="issuerAddress" value="Via dell'Artigianato, 12 - 00100 Roma" placeholder="Es. Via ..., CAP, Citta"/>
+        <div class="field-row">
+          <div>
+            <label>Email Emittente</label>
+            <input type="email" id="issuerEmail" value="info@edilartigiana.it" placeholder="info@azienda.it"/>
+          </div>
+          <div>
+            <label>Sito Web Emittente</label>
+            <input type="text" id="issuerWebsite" value="www.edilartigiana.it" placeholder="www.azienda.it"/>
+          </div>
+        </div>
         <label>Committente *</label>
         <input type="text" id="customerName" placeholder="Es. Mario Rossi"/>
         <label>Progetto *</label>
         <input type="text" id="projectName" placeholder="Es. Rifacimento Facciata"/>
+        <div class="field-row">
+          <div>
+            <label>Difficolta Cantiere</label>
+            <select id="difficultyLevel">
+              <option value="LOW">LOW</option>
+              <option value="MEDIUM" selected>MEDIUM</option>
+              <option value="HIGH">HIGH</option>
+            </select>
+          </div>
+          <div>
+            <label>Tempo Stimato (giorni)</label>
+            <input type="number" id="estimatedDays" value="3" min="1" step="1"/>
+          </div>
+        </div>
+        <div class="field-row">
+          <div>
+            <label>Ore Manodopera</label>
+            <input type="number" id="laborHours" value="16" min="1" step="1"/>
+          </div>
+          <div>
+            <label>Costo Orario Manodopera</label>
+            <input type="number" id="laborRate" value="85" min="0" step="1"/>
+          </div>
+        </div>
+        <div class="field-row">
+          <div>
+            <label>Spese Logistica / Trasferta</label>
+            <input type="number" id="logisticsCost" value="150" min="0" step="1"/>
+          </div>
+          <div>
+            <label>Oneri Sicurezza / Allestimento</label>
+            <input type="number" id="safetyCost" value="120" min="0" step="1"/>
+          </div>
+        </div>
+        <label>Sconto Ditta</label>
+        <input type="number" id="companyDiscount" value="0" min="0" step="1"/>
         <label>Descrizione *</label>
         <textarea id="workDescription" placeholder="Descrivi i lavori..."></textarea>
         <label>Note</label>
@@ -410,8 +470,6 @@ function showApp(){
   document.getElementById('userEmailDisplay').textContent=state.userEmail;
   initSectors();
   loadSector();
-  const saved=localStorage.getItem('preventivatore_apikey');
-  if(saved)document.getElementById('apiKeyInput').value=saved;
 }
 
 function updateCountry(){
@@ -515,27 +573,151 @@ async function callGeminiAPI(){
   const sec=SECTORS.find(s=>s.id===state.sectorId)||SECTORS[0];
   const custName=document.getElementById('customerName').value.trim();
   const projName=document.getElementById('projectName').value.trim();
+  const issuerCompany=document.getElementById('issuerCompany').value.trim();
+  const issuerVat=document.getElementById('issuerVat').value.trim();
+  const issuerAddress=document.getElementById('issuerAddress').value.trim();
+  const issuerPhone=document.getElementById('issuerPhone').value.trim();
+  const issuerEmail=document.getElementById('issuerEmail').value.trim();
+  const issuerWebsite=document.getElementById('issuerWebsite').value.trim();
+  const difficulty=(document.getElementById('difficultyLevel').value||'MEDIUM').trim();
+  const laborHours=parseFloat(document.getElementById('laborHours').value)||0;
+  const laborRate=parseFloat(document.getElementById('laborRate').value)||0;
+  const estDays=parseFloat(document.getElementById('estimatedDays').value)||0;
+  const logisticsCost=parseFloat(document.getElementById('logisticsCost').value)||0;
+  const safetyCost=parseFloat(document.getElementById('safetyCost').value)||0;
+  const companyDiscount=parseFloat(document.getElementById('companyDiscount').value)||0;
   const workDesc=document.getElementById('workDescription').value.trim();
   const notes=document.getElementById('additionalNotes').value.trim();
+  const vatRate=parseFloat(document.getElementById('vatRate').value)||0;
   const itemsStr=state.selectedItems.map(i=>`- ${i.name}: ${i.customPrice} ${co.symbol}/${i.unit} × ${i.quantity}`).join('\n');
-  const prompt=`Genera preventivo edile in italiano per: ${custName} - ${projName} (${sec.name}). Paese: ${co.name} IVA ${document.getElementById('vatRate').value}%. Descrizione: ${workDesc}. Lavorazioni:\n${itemsStr||'Nessuna'}. Rispondi SOLO JSON: {"feasibility":{"rating":4,"summary":"...","risks":["..."]},"costsBreakdown":[{"description":"...","quantity":1,"unit":"mq","unitPrice":100,"total":100}],"estimatedTime":"..."}`;
+  const prompt=`Genera un preventivo edile professionale in italiano, stile tecnico-legale (simile documento formale).
+
+Input:
+- Emittente: ${issuerCompany}, P.IVA/CF ${issuerVat}, ${issuerAddress}, Tel ${issuerPhone}, Email ${issuerEmail}, Sito ${issuerWebsite}
+- Committente: ${custName}
+- Progetto: ${projName}
+- Settore: ${sec.name}
+- Paese: ${co.name}
+- Valuta: ${co.currency} (${co.symbol})
+- IVA: ${vatRate}%
+- Difficolta cantiere: ${difficulty}
+- Ore manodopera: ${laborHours} (costo orario ${laborRate} ${co.symbol})
+- Tempo stimato: ${estDays} giorni lavorativi
+- Costi extra: logistica ${logisticsCost} ${co.symbol}, sicurezza ${safetyCost} ${co.symbol}, sconto ${companyDiscount} ${co.symbol}
+- Descrizione lavori: ${workDesc}
+- Note: ${notes||'Nessuna'}
+- Lavorazioni selezionate:\n${itemsStr||'Nessuna'}
+
+Rispondi SOLO JSON valido con questo schema:
+{
+  "meta": {"quoteId":"RIS-2026-0001","issueDate":"YYYY-MM-DD","estimatedTime":"3 giorni lavorativi"},
+  "offerLetter":"testo formale lungo",
+  "costsBreakdown":[{"description":"...","quantity":1,"unit":"mq","unitPrice":100,"total":100,"source":"Listino"}],
+  "discount":0,
+  "feasibility":{"status":"FATTIBILE","difficulty":"MEDIUM","summary":"...","risks":["..."],"mitigations":["..."]},
+  "compliance":[{"code":"SIA 118","title":"...","description":"...","mandatory":true}]
+}`;
   const resp=await fetch('/api/generate-quote',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})});
   const data=await resp.json();
   if(!resp.ok)throw new Error(data.error||'Errore generazione');
   return data;
 }
 
+function esc(value){
+  return String(value??'')
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
+
+function fmtMoney(value,symbol){
+  const n=Number(value)||0;
+  return `${n.toFixed(2)} ${symbol}`;
+}
+
 function renderQuote(data){
   const co=COUNTRIES[state.country];
-  const custName=document.getElementById('customerName').value;
-  const projName=document.getElementById('projectName').value;
-  const items=data.costsBreakdown||[];
+  const sec=SECTORS.find(s=>s.id===state.sectorId)||SECTORS[0];
+  const custName=document.getElementById('customerName').value.trim();
+  const projName=document.getElementById('projectName').value.trim();
+  const issuerCompany=document.getElementById('issuerCompany').value.trim();
+  const issuerVat=document.getElementById('issuerVat').value.trim();
+  const issuerAddress=document.getElementById('issuerAddress').value.trim();
+  const issuerPhone=document.getElementById('issuerPhone').value.trim();
+  const issuerEmail=document.getElementById('issuerEmail').value.trim();
+  const issuerWebsite=document.getElementById('issuerWebsite').value.trim();
+  const workDesc=document.getElementById('workDescription').value.trim();
+  const difficulty=(document.getElementById('difficultyLevel').value||'MEDIUM').trim();
+  const laborHours=parseFloat(document.getElementById('laborHours').value)||0;
+  const laborRate=parseFloat(document.getElementById('laborRate').value)||0;
+  const estDays=parseFloat(document.getElementById('estimatedDays').value)||0;
+  const logisticsCost=parseFloat(document.getElementById('logisticsCost').value)||0;
+  const safetyCost=parseFloat(document.getElementById('safetyCost').value)||0;
+  const companyDiscount=parseFloat(document.getElementById('companyDiscount').value)||0;
+  const vatRate=parseFloat(document.getElementById('vatRate').value)||0;
+
+  const meta=data.meta||{};
+  const quoteId=meta.quoteId||`RIS-${new Date().getFullYear()}-${Math.floor(1000+Math.random()*9000)}`;
+  const issueDate=(meta.issueDate||new Date().toISOString().slice(0,10)).slice(0,10);
+  const aiItems=Array.isArray(data.costsBreakdown)?data.costsBreakdown:[];
+  const laborTotal=laborHours*laborRate;
+  const extraRows=[
+    {description:'Lavorazione manodopera specializzata',quantity:laborHours,unit:'ore',unitPrice:laborRate,total:laborTotal,source:'Listino'},
+    {description:'Spese trasferta / logistica',quantity:1,unit:'lotto',unitPrice:logisticsCost,total:logisticsCost,source:'Listino'},
+    {description:'Allestimento cantiere / oneri sicurezza',quantity:1,unit:'lotto',unitPrice:safetyCost,total:safetyCost,source:'Listino'}
+  ];
+  const items=[...aiItems,...extraRows].map((item)=>{
+    const q=Number(item.quantity)||0;
+    const up=Number(item.unitPrice)||0;
+    const tt=Number(item.total)||q*up;
+    return {description:item.description||'Voce',quantity:q,unit:item.unit||'lotto',unitPrice:up,total:tt,source:item.source||'Listino'};
+  });
+
   const subtotal=items.reduce((s,i)=>s+(i.total||0),0);
-  const vat=(subtotal*(parseFloat(document.getElementById('vatRate').value)/100));
-  const total=subtotal+vat;
-  let html=`<div class="quote-doc"><h1 style="margin-bottom:12px">PREVENTIVO</h1><p style="font-size:12px;color:var(--txt2);margin-bottom:16px">Progetto: <strong>${projName}</strong><br/>Committente: <strong>${custName}</strong></p>`;
-  if(items.length){html+=`<table class="cost-table"><thead><tr><th>Descrizione</th><th style="text-align:right">Q.tà</th><th style="text-align:right">Unitario</th><th style="text-align:right">Totale</th></tr></thead><tbody>`;items.forEach(item=>{html+=`<tr><td>${item.description}</td><td style="text-align:right">${item.quantity} ${item.unit}</td><td style="text-align:right">${item.unitPrice.toFixed(2)} ${co.symbol}</td><td style="text-align:right;font-weight:600">${item.total.toFixed(2)} ${co.symbol}</td></tr>`;});html+=`</tbody></table>`;}
-  html+=`<div style="border-top:1px solid var(--border);padding-top:12px;margin-top:12px"><div style="display:flex;justify-content:space-between;margin-bottom:6px"><span>Imponibile</span><strong>${subtotal.toFixed(2)} ${co.symbol}</strong></div><div style="display:flex;justify-content:space-between;margin-bottom:10px"><span>IVA ${document.getElementById('vatRate').value}%</span><strong>${vat.toFixed(2)} ${co.symbol}</strong></div><div style="display:flex;justify-content:space-between;font-size:16px;font-weight:700;color:var(--accent)"><span>TOTALE</span><span>${total.toFixed(2)} ${co.symbol}</span></div></div>`;if(data.feasibility){html+=`<div style="margin-top:16px;padding:12px;background:var(--success-bg);border-left:3px solid var(--success);border-radius:0 4px 4px 0"><strong style="color:var(--success)">✓ Fattibilità</strong><p style="margin:4px 0 0;font-size:12px">${data.feasibility.summary||'Ok'}</p></div>`;}
+  const base=Math.max(0,subtotal-companyDiscount);
+  const vat=base*(vatRate/100);
+  const total=base+vat;
+
+  const feasibility=data.feasibility||{};
+  const status=feasibility.status||'FATTIBILE';
+  const summary=feasibility.summary||'Analisi completata con esito positivo.';
+  const risks=Array.isArray(feasibility.risks)&&feasibility.risks.length?feasibility.risks:['Possibile presenza di variabili operative in cantiere'];
+  const mitigations=Array.isArray(feasibility.mitigations)&&feasibility.mitigations.length?feasibility.mitigations:['Sopralluogo tecnico preliminare e piano operativo dettagliato'];
+  const compliance=Array.isArray(data.compliance)&&data.compliance.length?data.compliance:[
+    {code:'SIA 248',title:'Normativa svizzera lavori di pittura e gessatura',description:'Standard qualitativi delle superfici interne.',mandatory:true},
+    {code:'SIA 118',title:'Condizioni generali per lavori di costruzione',description:'Regola il rapporto contrattuale tra committente e impresa.',mandatory:true}
+  ];
+  const offerLetter=data.offerLetter||`Gentile ${custName}, con la presente Le sottoponiamo la proposta tecnico-economica per il progetto ${projName}. L'offerta e stata costruita nel rispetto delle buone pratiche di settore e delle normative applicabili.`;
+
+  let html=`<div class="quote-doc">`;
+  html+=`<h1 style="margin-bottom:6px">PREVENTIVO PROFESSIONALE</h1>`;
+  html+=`<p style="font-size:12px;color:var(--txt2);margin-bottom:12px">Identificativo: <strong>${esc(quoteId)}</strong><br/>Data Emissione: <strong>${esc(issueDate)}</strong></p>`;
+  html+=`<div class="field-row" style="grid-template-columns:1fr 1fr;gap:20px;margin-bottom:12px">`;
+  html+=`<div style="font-size:12px;line-height:1.7"><strong>EMITTENTE (PRESTATORE D'OPERA):</strong><br/>${esc(issuerCompany)}<br/>P.IVA/CF: ${esc(issuerVat)}<br/>${esc(issuerAddress)}<br/>Tel: ${esc(issuerPhone)}<br/>Email: ${esc(issuerEmail)}<br/>Sito Web: ${esc(issuerWebsite)}</div>`;
+  html+=`<div style="font-size:12px;line-height:1.7"><strong>COMMITTENTE & SITO OPERA:</strong><br/>CLIENTE: ${esc(custName)}<br/>PROGETTO: ${esc(projName)}<br/>SETTORE: ${esc(sec.name.toUpperCase())}<br/>PAESE: ${esc(co.name)}<br/>REGIME IVA: ${esc(vatRate)}% (${esc(co.currency)})</div>`;
+  html+=`</div>`;
+  html+=`<h3 style="margin-bottom:6px">DESCRIZIONE DEI LAVORI RICHIESTI</h3><p style="font-size:12px;line-height:1.7;margin-bottom:12px">${esc(workDesc)}</p>`;
+  html+=`<h3 style="margin-bottom:6px">LETTERA DI PRESENTAZIONE ED OFFERTA</h3><p style="font-size:12px;line-height:1.7;margin-bottom:12px">${esc(offerLetter)}</p>`;
+  html+=`<h3 style="margin-bottom:6px">COMPUTO METRICO ED ANAGRAFICA COSTI</h3><p style="font-size:12px;color:var(--txt2);margin-bottom:8px">Tempo totale stimato per l'esecuzione: <strong>${esc(meta.estimatedTime||(`${estDays} giorni lavorativi`))}</strong></p>`;
+  html+=`<table class="cost-table"><thead><tr><th>Descrizione lavorazione / voce di costo</th><th style="text-align:right">Quantita</th><th style="text-align:right">Prezzo (${esc(co.symbol)})</th><th style="text-align:right">Totale (${esc(co.symbol)})</th><th style="text-align:right">Fonte</th></tr></thead><tbody>`;
+  items.forEach((item)=>{html+=`<tr><td>${esc(item.description)}</td><td style="text-align:right">${esc(item.quantity)} ${esc(item.unit)}</td><td style="text-align:right">${fmtMoney(item.unitPrice,co.symbol)}</td><td style="text-align:right;font-weight:600">${fmtMoney(item.total,co.symbol)}</td><td style="text-align:right">${esc(item.source)}</td></tr>`;});
+  html+=`</tbody></table>`;
+  html+=`<div style="border-top:1px solid var(--border);padding-top:12px;margin-top:12px;font-size:12px">`;
+  html+=`<div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Lavorazioni Subtotale</span><strong>${fmtMoney(subtotal,co.symbol)}</strong></div>`;
+  html+=`<div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Sconto Applicato ditta</span><strong>- ${fmtMoney(companyDiscount,co.symbol)}</strong></div>`;
+  html+=`<div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Base Imponibile Lorda</span><strong>${fmtMoney(base,co.symbol)}</strong></div>`;
+  html+=`<div style="display:flex;justify-content:space-between;margin-bottom:8px"><span>Imposta Valore Aggiunto (IVA ${esc(vatRate)}%)</span><strong>${fmtMoney(vat,co.symbol)}</strong></div>`;
+  html+=`<div style="display:flex;justify-content:space-between;font-size:16px;font-weight:700;color:var(--accent)"><span>TOTALE FINALE (IVA Incl.)</span><span>${fmtMoney(total,co.symbol)}</span></div>`;
+  html+=`</div>`;
+  html+=`<h3 style="margin:14px 0 6px">VERIFICA FATTIBILITA & RISCHI DI CANTIERE</h3>`;
+  html+=`<div style="margin-top:6px;padding:12px;background:var(--success-bg);border-left:3px solid var(--success);border-radius:0 4px 4px 0"><strong style="color:var(--success)">${esc(status)}</strong><p style="margin:4px 0 0;font-size:12px">Analisi condotta per un livello di difficolta: <strong>${esc(feasibility.difficulty||difficulty)}</strong></p><p style="margin:6px 0 0;font-size:12px">${esc(summary)}</p></div>`;
+  html+=`<p style="font-size:12px;margin-top:8px"><strong>Criticita ed elementi di attenzione rilevati:</strong></p><ul style="margin:6px 0 0 18px;font-size:12px;line-height:1.6">${risks.map(r=>`<li>${esc(r)}</li>`).join('')}</ul>`;
+  html+=`<p style="font-size:12px;margin-top:8px"><strong>Raccomandazioni operative e mitigazioni suggerite:</strong></p><ul style="margin:6px 0 0 18px;font-size:12px;line-height:1.6">${mitigations.map(r=>`<li>${esc(r)}</li>`).join('')}</ul>`;
+  html+=`<h3 style="margin:14px 0 6px">ADEMPIMENTI NORMATIVI E CERTIFICAZIONI OBBLIGATORIE</h3><div style="font-size:12px;line-height:1.7">${compliance.map(c=>`<div style="margin-bottom:6px"><strong>${esc(c.title||'Norma')} [${esc(c.code||'-')}]</strong> <span style="color:var(--accent)">${c.mandatory?'OBBLIGATORIO':'RACCOMANDATO'}</span><div style="color:var(--txt2)">${esc(c.description||'')}</div></div>`).join('')}</div>`;
+  html+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:18px"><div style="border-top:1px solid var(--border);padding-top:8px;font-size:12px">Firma del Committente per approvazione (${esc(custName)})</div><div style="border-top:1px solid var(--border);padding-top:8px;font-size:12px">Sottoscrizione per ${esc(issuerCompany)}</div></div>`;
+  html+=`<p style="font-size:11px;color:var(--txt3);margin-top:12px">Preventivatore Edile AI - Generato in ${esc(co.name)} | Lettera e computo metrico con valore legale locale. Riserva d'opera.</p>`;
   html+=`</div>`;
   html+=`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px"><button type="button" class="btn-secondary" onclick="downloadQuotePdf()">⬇ Scarica PDF</button><button type="button" class="btn-secondary" onclick="shareQuoteWhatsApp()">📲 Condividi WhatsApp</button><button type="button" class="btn-secondary" onclick="shareQuoteEmail()">✉ Condividi Email</button></div>`;
   document.getElementById('previewContent').innerHTML=html;
